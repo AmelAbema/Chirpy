@@ -3,8 +3,8 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
+	"strings"
 )
 
 func handler(w http.ResponseWriter, _ *http.Request) {
@@ -73,19 +73,26 @@ func validateChirp(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 
+	toCheck := strings.Split(resp.Body, " ")
+
+	for i, str := range toCheck {
+		if strings.ToLower(str) == "kerfuffle" || strings.ToLower(str) == "sharbert" || strings.ToLower(str) == "fornax" {
+			toCheck[i] = "****"
+		}
+	}
+
 	dat, err := json.Marshal(struct {
-		Valid bool `json:"valid"`
+		Body string `json:"cleaned_body"`
 	}{
-		Valid: true,
+		Body: strings.Join(toCheck, " "),
 	},
 	)
 	if err != nil {
-		log.Printf("Error marshalling JSON: %s", err)
-		w.WriteHeader(500)
-	}
-	_, err1 := w.Write(dat)
-	if err1 != nil {
-		log.Printf("Error: %v", err1)
+		return
 	}
 
+	_, err1 := w.Write(dat)
+	if err1 != nil {
+		return
+	}
 }
