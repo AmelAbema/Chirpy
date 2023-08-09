@@ -2,8 +2,10 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 )
 
@@ -31,69 +33,82 @@ func (cfg *apiConfig) handleMetrics(w http.ResponseWriter, _ *http.Request) {
 	}
 }
 
-type Chirp struct {
-	Body string `json:"body"`
+func (cfg *apiConfig) handlerChirpsCreate(w http.ResponseWriter, r *http.Request) {
+	type parameters struct {
+		Body string `json:"body"`
+	}
+
+	decoder := json.NewDecoder(r.Body)
+	params := parameters{}
+	err := decoder.Decode(&params)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't decode parameters")
+		return
+	}
+
+	cleaned, err := validateChirp(params.Body)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	chirp, err := cfg.DB.CreateChirp(cleaned)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't create chirp")
+		return
+	}
+
+	respondWithJSON(w, http.StatusCreated, Chirp{
+		ID:   chirp.ID,
+		Body: chirp.Body,
+	})
 }
 
-func validateChirp(w http.ResponseWriter, r *http.Request) {
+func validateChirp(body string) (string, error) {
+	const maxChirpLength = 140
+	if len(body) > maxChirpLength {
+		return "", errors.New("chirp is too long")
+	}
 
-	w.Header().Add("Content-Type", "application/json")
-	decoder := json.NewDecoder(r.Body)
+	badWords := map[string]struct{}{
+		"kerfuffle": {},
+		"sharbert":  {},
+		"fornax":    {},
+	}
+	cleaned := getCleanedBody(body, badWords)
+	return cleaned, nil
+}
 
-	resp := Chirp{}
-	err := decoder.Decode(&resp)
+func getCleanedBody(body string, badWords map[string]struct{}) string {
+	words := strings.Split(body, " ")
+	for i, word := range words {
+		loweredWord := strings.ToLower(word)
+		if _, ok := badWords[loweredWord]; ok {
+			words[i] = "****"
+		}
+	}
+	cleaned := strings.Join(words, " ")
+	return cleaned
+}
+
+func (cfg *apiConfig) handlerChirpsRetrieve(w http.ResponseWriter, _ *http.Request) {
+	dbChirps, err := cfg.DB.GetChirps()
 	if err != nil {
-		i, _ := json.Marshal(struct {
-			Error string `json:"error"`
-		}{
-			Error: "Something went wrong",
-		},
-		)
-		w.WriteHeader(http.StatusBadRequest)
-		_, err := w.Write(i)
-		if err != nil {
-			return
-		}
+		respondWithError(w, http.StatusInternalServerError, "Couldn't retrieve chirps")
 		return
 	}
 
-	if len(resp.Body) > 140 {
-		i, _ := json.Marshal(struct {
-			Error string `json:"error"`
-		}{
-			Error: "Chirp is too long",
-		},
-		)
-		w.WriteHeader(http.StatusBadRequest)
-		_, err := w.Write(i)
-		if err != nil {
-			return
-		}
-		return
+	var chirps []Chirp
+	for _, dbChirp := range dbChirps {
+		chirps = append(chirps, Chirp{
+			ID:   dbChirp.ID,
+			Body: dbChirp.Body,
+		})
 	}
 
-	w.WriteHeader(http.StatusOK)
+	sort.Slice(chirps, func(i, j int) bool {
+		return chirps[i].ID < chirps[j].ID
+	})
 
-	toCheck := strings.Split(resp.Body, " ")
-
-	for i, str := range toCheck {
-		if strings.ToLower(str) == "kerfuffle" || strings.ToLower(str) == "sharbert" || strings.ToLower(str) == "fornax" {
-			toCheck[i] = "****"
-		}
-	}
-
-	dat, err := json.Marshal(struct {
-		Body string `json:"cleaned_body"`
-	}{
-		Body: strings.Join(toCheck, " "),
-	},
-	)
-	if err != nil {
-		return
-	}
-
-	_, err1 := w.Write(dat)
-	if err1 != nil {
-		return
-	}
+	respondWithJSON(w, http.StatusOK, chirps)
 }
