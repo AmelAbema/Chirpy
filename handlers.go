@@ -31,13 +31,14 @@ func (cfg *apiConfig) handleMetrics(w http.ResponseWriter, _ *http.Request) {
 	}
 }
 
+type Chirp struct {
+	Body string `json:"body"`
+}
+
 func validateChirp(w http.ResponseWriter, r *http.Request) {
+
 	w.Header().Add("Content-Type", "application/json")
 	decoder := json.NewDecoder(r.Body)
-
-	type Chirp struct {
-		Body string `json:"body"`
-	}
 
 	resp := Chirp{}
 	err := decoder.Decode(&resp)
