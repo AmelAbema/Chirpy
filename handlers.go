@@ -62,6 +62,7 @@ func (cfg *apiConfig) handlerChirpsCreate(w http.ResponseWriter, r *http.Request
 		ID:   chirp.ID,
 		Body: chirp.Body,
 	})
+
 }
 
 func validateChirp(body string) (string, error) {
