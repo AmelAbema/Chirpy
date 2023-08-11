@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/go-chi/chi/v5"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -31,6 +33,26 @@ func (cfg *apiConfig) handleMetrics(w http.ResponseWriter, _ *http.Request) {
 	if err != nil {
 		return
 	}
+}
+
+func (cfg *apiConfig) handleChirpId(w http.ResponseWriter, r *http.Request) {
+	chirpIDString := chi.URLParam(r, "chirpID")
+	chirpID, err := strconv.Atoi(chirpIDString)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid chirp ID")
+		return
+	}
+
+	dbChirp, err := cfg.DB.GetChirpByID(chirpID)
+	if err != nil {
+		respondWithError(w, http.StatusNotFound, "Couldn't get chirp")
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, Chirp{
+		ID:   dbChirp.ID,
+		Body: dbChirp.Body,
+	})
 }
 
 func (cfg *apiConfig) handlerChirpsCreate(w http.ResponseWriter, r *http.Request) {

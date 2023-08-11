@@ -1,4 +1,4 @@
-POST http://localhost:8080/api/validate_chirp
+GET http://localhost:8080/api/chirps/1
 Content-Type: application/json
 
 {
@@ -6,3 +6,4 @@ Content-Type: application/json
 }
 
 ###
+GET http://localhost:8080/api/chirps/1

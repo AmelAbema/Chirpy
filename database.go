@@ -21,6 +21,8 @@ type Chirp struct {
 	Body string `json:"body"`
 }
 
+var ErrNotExist = errors.New("resource does not exist")
+
 func NewDB(path string) (*DB, error) {
 	db := &DB{
 		path: path,
@@ -63,6 +65,19 @@ func (db *DB) GetChirps() ([]Chirp, error) {
 	}
 
 	return chirps, nil
+}
+func (db *DB) GetChirpByID(id int) (Chirp, error) {
+	dbStructure, err := db.loadDB()
+	if err != nil {
+		return Chirp{}, err
+	}
+
+	chirp, ok := dbStructure.Chirps[id]
+	if !ok {
+		return Chirp{}, ErrNotExist
+	}
+
+	return chirp, nil
 }
 
 func (db *DB) createDB() error {
