@@ -74,7 +74,7 @@ func validateChirp(body string) (string, error) {
 	badWords := map[string]struct{}{
 		"kerfuffle": {},
 		"sharbert":  {},
-		"fornax":    {},
+		"fornax1":   {},
 	}
 	cleaned := getCleanedBody(body, badWords)
 	return cleaned, nil
