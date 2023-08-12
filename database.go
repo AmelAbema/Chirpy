@@ -18,8 +18,9 @@ type DBStructure struct {
 }
 
 type User struct {
-	ID    int    `json:"id"`
-	Email string `json:"email"`
+	ID       int    `json:"id"`
+	Email    string `json:"email"`
+	Password []byte `json:"password"`
 }
 
 type Chirp struct {
@@ -59,17 +60,23 @@ func (db *DB) CreateChirp(body string) (Chirp, error) {
 	return chirp, nil
 }
 
-func (db *DB) CreateUser(email string) (User, error) {
+func (db *DB) CreateUser(email string, pass []byte) (User, error) {
 
 	dbStructure, err := db.loadDB()
 	if err != nil {
 		return User{}, err
 	}
 
+	for _, user := range dbStructure.Users {
+		if user.Email == email {
+			return User{}, errors.New("email already exists")
+		}
+	}
 	id := len(dbStructure.Users) + 1
 	user := User{
-		ID:    id,
-		Email: email,
+		ID:       id,
+		Email:    email,
+		Password: pass,
 	}
 	dbStructure.Users[id] = user
 
@@ -80,7 +87,19 @@ func (db *DB) CreateUser(email string) (User, error) {
 
 	return user, nil
 }
+func (db *DB) GetUsers() ([]User, error) {
+	dbStructure, err := db.loadDB()
+	if err != nil {
+		return nil, err
+	}
 
+	users := make([]User, 0, len(dbStructure.Users))
+	for _, user := range dbStructure.Users {
+		users = append(users, user)
+	}
+
+	return users, nil
+}
 func (db *DB) GetChirps() ([]Chirp, error) {
 	dbStructure, err := db.loadDB()
 	if err != nil {
@@ -133,6 +152,7 @@ func (db *DB) loadDB() (DBStructure, error) {
 	if errors.Is(err, os.ErrNotExist) {
 		return dbStructure, err
 	}
+
 	err = json.Unmarshal(dat, &dbStructure)
 	if err != nil {
 		return dbStructure, err

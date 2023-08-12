@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/go-chi/chi/v5"
+	"golang.org/x/crypto/bcrypt"
 	"net/http"
 	"sort"
 	"strconv"
@@ -57,7 +58,8 @@ func (cfg *apiConfig) handleChirpId(w http.ResponseWriter, r *http.Request) {
 
 func (cfg *apiConfig) handlerUsersCreate(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
-		Email string `json:"email"`
+		Email    string `json:"email"`
+		Password string `json:"password"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -68,9 +70,14 @@ func (cfg *apiConfig) handlerUsersCreate(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	user, err := cfg.DB.CreateUser(params.Email)
+	pass, err1 := bcrypt.GenerateFromPassword([]byte(params.Password), 1)
+	if err1 != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't encrypt password")
+		return
+	}
+	user, err := cfg.DB.CreateUser(params.Email, pass)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Couldn't create chirp")
+		respondWithError(w, http.StatusInternalServerError, "Couldn't create User")
 		return
 	}
 	respondWithJSON(w, http.StatusCreated, User{
@@ -159,4 +166,41 @@ func (cfg *apiConfig) handlerChirpsRetrieve(w http.ResponseWriter, _ *http.Reque
 	})
 
 	respondWithJSON(w, http.StatusOK, chirps)
+}
+
+func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
+	type parameters struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+
+	users, err1 := cfg.DB.GetUsers()
+	if err1 != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't decode parameters")
+		return
+	}
+
+	decoder := json.NewDecoder(r.Body)
+	params := parameters{}
+	err := decoder.Decode(&params)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't decode parameters")
+		return
+	}
+
+	for _, user := range users {
+		if user.Email == params.Email {
+			err := bcrypt.CompareHashAndPassword(user.Password, []byte(params.Password))
+			if err != nil {
+				respondWithError(w, http.StatusUnauthorized, "bad password")
+				return
+			}
+			respondWithJSON(w, http.StatusOK, User{
+				ID:    user.ID,
+				Email: user.Email,
+			})
+			return
+		}
+	}
+	respondWithError(w, http.StatusUnauthorized, "bad email")
 }
