@@ -21,6 +21,7 @@ type User struct {
 	ID       int    `json:"id"`
 	Email    string `json:"email"`
 	Password []byte `json:"password"`
+	Token    string `json:"token"`
 }
 
 type Chirp struct {
@@ -87,6 +88,22 @@ func (db *DB) CreateUser(email string, pass []byte) (User, error) {
 
 	return user, nil
 }
+
+func (db *DB) GetUserByEmail(email string) (User, error) {
+	dbStructure, err := db.loadDB()
+	if err != nil {
+		return User{}, err
+	}
+
+	for _, user := range dbStructure.Users {
+		if user.Email == email {
+			return user, nil
+		}
+	}
+
+	return User{}, ErrNotExist
+}
+
 func (db *DB) GetUsers() ([]User, error) {
 	dbStructure, err := db.loadDB()
 	if err != nil {

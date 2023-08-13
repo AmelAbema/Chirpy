@@ -4,12 +4,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/AmelAbema/Chirpy/auth"
 	"github.com/go-chi/chi/v5"
 	"golang.org/x/crypto/bcrypt"
 	"net/http"
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func handler(w http.ResponseWriter, _ *http.Request) {
@@ -170,14 +172,13 @@ func (cfg *apiConfig) handlerChirpsRetrieve(w http.ResponseWriter, _ *http.Reque
 
 func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
+		Password         string `json:"password"`
+		Email            string `json:"email"`
+		ExpiresInSeconds int    `json:"expires_in_seconds"`
 	}
-
-	users, err1 := cfg.DB.GetUsers()
-	if err1 != nil {
-		respondWithError(w, http.StatusInternalServerError, "Couldn't decode parameters")
-		return
+	type response struct {
+		User
+		Token string `json:"token"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -188,19 +189,59 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	for _, user := range users {
-		if user.Email == params.Email {
-			err := bcrypt.CompareHashAndPassword(user.Password, []byte(params.Password))
-			if err != nil {
-				respondWithError(w, http.StatusUnauthorized, "bad password")
-				return
-			}
-			respondWithJSON(w, http.StatusOK, User{
-				ID:    user.ID,
-				Email: user.Email,
-			})
-			return
-		}
+	user, err := cfg.DB.GetUserByEmail(params.Email)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't get user")
+		return
 	}
-	respondWithError(w, http.StatusUnauthorized, "bad email")
+
+	err = auth.CheckPasswordHash(params.Password, string(user.Password))
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Invalid password")
+		return
+	}
+
+	defaultExpiration := 60 * 60 * 24
+	if params.ExpiresInSeconds == 0 {
+		params.ExpiresInSeconds = defaultExpiration
+	} else if params.ExpiresInSeconds > defaultExpiration {
+		params.ExpiresInSeconds = defaultExpiration
+	}
+
+	token, err := auth.MakeJWT(user.ID, cfg.JwtToken, time.Duration(params.ExpiresInSeconds)*time.Second)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't create JWT")
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, response{
+		User: User{
+			ID:    user.ID,
+			Email: user.Email,
+		},
+		Token: token,
+	})
+}
+
+func (db *DB) UpdateUser(id int, email, hashedPassword string) (User, error) {
+	dbStructure, err := db.loadDB()
+	if err != nil {
+		return User{}, err
+	}
+
+	user, ok := dbStructure.Users[id]
+	if !ok {
+		return User{}, ErrNotExist
+	}
+
+	user.Email = email
+	user.Password = []byte(hashedPassword)
+	dbStructure.Users[id] = user
+
+	err = db.writeDB(dbStructure)
+	if err != nil {
+		return User{}, err
+	}
+
+	return user, nil
 }

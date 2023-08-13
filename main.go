@@ -2,16 +2,25 @@ package main
 
 import (
 	"github.com/go-chi/chi/v5"
+	"github.com/joho/godotenv"
 	"log"
 	"net/http"
+	"os"
 )
 
 type apiConfig struct {
 	fileServerHits int
 	DB             *DB
+	JwtToken       string
 }
 
 func main() {
+	err := godotenv.Load()
+	if err != nil {
+		return
+	}
+	jwtSecret := os.Getenv("JWT_SECRET")
+
 	db, err := NewDB("database.json")
 	if err != nil {
 		log.Fatal(err)
@@ -19,6 +28,7 @@ func main() {
 	cfg := apiConfig{
 		fileServerHits: 0,
 		DB:             db,
+		JwtToken:       jwtSecret,
 	}
 
 	router := chi.NewRouter()
