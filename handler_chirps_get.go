@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/AmelAbema/Chirpy/internal/database"
 	"net/http"
 	"sort"
 	"strconv"
@@ -29,20 +30,26 @@ func (cfg *apiConfig) handlerChirpsGet(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (cfg *apiConfig) handlerChirpsRetrieve(w http.ResponseWriter, _ *http.Request) {
+func (cfg *apiConfig) handlerChirpsRetrieve(w http.ResponseWriter, r *http.Request) {
+
+	var chirps []Chirp
+
 	dbChirps, err := cfg.DB.GetChirps()
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't retrieve chirps")
 		return
 	}
 
-	var chirps []Chirp
-	for _, dbChirp := range dbChirps {
-		chirps = append(chirps, Chirp{
-			ID:       dbChirp.ID,
-			AuthorID: dbChirp.AuthorID,
-			Body:     dbChirp.Body,
-		})
+	s := r.URL.Query().Get("author_id")
+	if s != "" {
+		id, err := strconv.Atoi(s)
+		if err != nil {
+			respondWithError(w, http.StatusInternalServerError, "Couldn't retrieve chirps")
+			return
+		}
+		chirps = retrieveChirps(id, dbChirps, chirps)
+	} else {
+		chirps = retrieveChirps(0, dbChirps, chirps)
 	}
 
 	sort.Slice(chirps, func(i, j int) bool {
@@ -50,4 +57,27 @@ func (cfg *apiConfig) handlerChirpsRetrieve(w http.ResponseWriter, _ *http.Reque
 	})
 
 	respondWithJSON(w, http.StatusOK, chirps)
+}
+
+func retrieveChirps(id int, dbChirps []database.Chirp, chirps []Chirp) []Chirp {
+
+	for _, dbChirp := range dbChirps {
+		if id == 0 {
+			chirps = append(chirps, Chirp{
+				ID:       dbChirp.ID,
+				AuthorID: dbChirp.AuthorID,
+				Body:     dbChirp.Body,
+			})
+		} else {
+			if dbChirp.AuthorID == id {
+				chirps = append(chirps, Chirp{
+					ID:       dbChirp.ID,
+					AuthorID: dbChirp.AuthorID,
+					Body:     dbChirp.Body,
+				})
+			}
+		}
+
+	}
+	return chirps
 }
