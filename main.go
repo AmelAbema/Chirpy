@@ -1,62 +1,85 @@
 package main
 
 import (
-	"github.com/go-chi/chi/v5"
-	"github.com/joho/godotenv"
+	"flag"
+	"github.com/AmelAbema/Chirpy/internal/database"
 	"log"
 	"net/http"
 	"os"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/joho/godotenv"
 )
 
 type apiConfig struct {
-	fileServerHits int
-	DB             *DB
-	JwtToken       string
+	fileserverHits int
+	DB             *database.DB
+	jwtSecret      string
 }
 
 func main() {
-	err := godotenv.Load()
+	const filepathRoot = "."
+	const port = "8080"
+
+	err := godotenv.Load(".env")
 	if err != nil {
 		return
 	}
-	jwtSecret := os.Getenv("JWT_SECRET")
 
-	db, err := NewDB("database.json")
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		log.Fatal("JWT_SECRET environment variable is not set")
+	}
+
+	db, err := database.NewDB("database.json")
 	if err != nil {
 		log.Fatal(err)
 	}
-	cfg := apiConfig{
-		fileServerHits: 0,
+
+	dbg := flag.Bool("debug", false, "Enable debug mode")
+	flag.Parse()
+	if dbg != nil && *dbg {
+		err := db.ResetDB()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	apiCfg := apiConfig{
+		fileserverHits: 0,
 		DB:             db,
-		JwtToken:       jwtSecret,
+		jwtSecret:      jwtSecret,
 	}
 
 	router := chi.NewRouter()
-
-	router.Handle("/app/*", cfg.middlewareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir(".")))))
-	router.Handle("/app", cfg.middlewareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir(".")))))
+	fsHandler := apiCfg.middlewareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir(filepathRoot))))
+	router.Handle("/app", fsHandler)
+	router.Handle("/app/*", fsHandler)
 
 	apiRouter := chi.NewRouter()
-	router.Mount("/api", apiRouter)
-	apiRouter.Get("/healthz", handler)
-	apiRouter.Post("/chirps", cfg.handlerChirpsCreate)
-	apiRouter.Get("/chirps", cfg.handlerChirpsRetrieve)
-	apiRouter.Get("/chirps/{chirpID}", cfg.handleChirpId)
-	apiRouter.Post("/users", cfg.handlerUsersCreate)
-	apiRouter.Post("/login", cfg.handlerLogin)
+	apiRouter.Get("/healthz", handlerReadiness)
 
-	metricsRouter := chi.NewRouter()
-	router.Mount("/admin", metricsRouter)
-	metricsRouter.Get("/metrics", cfg.handleMetrics)
+	apiRouter.Post("/login", apiCfg.handlerLogin)
+
+	apiRouter.Post("/users", apiCfg.handlerUsersCreate)
+	apiRouter.Put("/users", apiCfg.handlerUsersUpdate)
+
+	apiRouter.Post("/chirps", apiCfg.handlerChirpsCreate)
+	apiRouter.Get("/chirps", apiCfg.handlerChirpsRetrieve)
+	apiRouter.Get("/chirps/{chirpID}", apiCfg.handlerChirpsGet)
+	router.Mount("/api", apiRouter)
+
+	adminRouter := chi.NewRouter()
+	adminRouter.Get("/metrics", apiCfg.handlerMetrics)
+	router.Mount("/admin", adminRouter)
 
 	corsMux := middlewareCors(router)
 
-	server := &http.Server{
+	srv := &http.Server{
+		Addr:    ":" + port,
 		Handler: corsMux,
-		Addr:    ":8080",
 	}
 
-	log.Printf("Serving on port: %s\n", "8080")
-	log.Fatal(server.ListenAndServe())
-
+	log.Printf("Serving files from %s on port: %s\n", filepathRoot, port)
+	log.Fatal(srv.ListenAndServe())
 }

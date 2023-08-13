@@ -1,9 +1,0 @@
-GET http://localhost:8080/api/chirps/1
-Content-Type: application/json
-
-{
-  "body": "This is an opinion I need to share with the world"
-}
-
-###
-GET http://localhost:8080/api/chirps/1

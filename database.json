@@ -1,11 +1,1 @@
-{
-  "chirps": {},
-  "users": {
-    "1": {
-      "id": 1,
-      "email": "saul@bettercall.com",
-      "password": "JDJhJDEwJDA5Uy4uUzBjSFRsZkozUUI5dVBnU3UzeDVXWFBGdEVqb1lOYy80Qy94bU1SWE4wVEo1Lmdx",
-      "token": ""
-    }
-  }
-}
+{"chirps":{},"users":{"1":{"id":1,"email":"mike@bettercall.com","hashed_password":"$2a$10$VPdE5djIj/P9Zvh9gwMpueFYqWXtXkU/Sl9UAgk9ePJZ26.wkHNdi"}}}
