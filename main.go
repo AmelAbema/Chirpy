@@ -15,6 +15,7 @@ type apiConfig struct {
 	fileserverHits int
 	DB             *database.DB
 	jwtSecret      string
+	polkaKey       string
 }
 
 func main() {
@@ -24,6 +25,11 @@ func main() {
 	err := godotenv.Load(".env")
 	if err != nil {
 		return
+	}
+
+	polkaKey := os.Getenv("POLKA_KEY")
+	if polkaKey == "" {
+		log.Fatal("POLKA_KEY environment variable is not set")
 	}
 
 	jwtSecret := os.Getenv("JWT_SECRET")
@@ -49,6 +55,7 @@ func main() {
 		fileserverHits: 0,
 		DB:             db,
 		jwtSecret:      jwtSecret,
+		polkaKey:       polkaKey,
 	}
 
 	router := chi.NewRouter()

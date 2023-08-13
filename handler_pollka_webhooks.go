@@ -2,10 +2,22 @@ package main
 
 import (
 	"encoding/json"
+	"github.com/AmelAbema/Chirpy/internal/auth"
 	"net/http"
 )
 
 func (cfg *apiConfig) handlerPolkaWebhooks(w http.ResponseWriter, r *http.Request) {
+	token, err1 := auth.GetBearerToken(r.Header)
+	if err1 != nil {
+		respondWithError(w, http.StatusUnauthorized, "Couldn't find ApiKey")
+		return
+	}
+
+	if token != cfg.polkaKey {
+		respondWithError(w, http.StatusUnauthorized, "Couldn't validate JWT")
+		return
+	}
+
 	type parameters struct {
 		Event string `json:"event"`
 		Data  struct {
