@@ -49,6 +49,7 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 		User: User{
 			ID:    user.ID,
 			Email: user.Email,
+			IsRed: user.IsRed,
 		},
 		Token:  token,
 		RToken: rToken,

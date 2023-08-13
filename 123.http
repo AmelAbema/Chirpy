@@ -18,11 +18,13 @@ Content-Type: application/json
 
 ###
 
-PUT http://localhost:8080/api/users
+POST http://localhost:8080/api/polka/webhooks
 Content-Type: application/json
 
 {
-  "email": "123@gmail.com",
-  "password": "qwe"
+  "event": "user.upgraded",
+  "data": {
+    "user_id": 1
+  }
 }
 
